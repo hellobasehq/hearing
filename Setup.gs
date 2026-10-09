@@ -14,14 +14,44 @@ function setup() {
   console.log('台帳を作成しました: ' + ss.getUrl());
 }
 
-// お客様ごとのスプシを作り、台帳に登録する
-// 使い方：createCustomer('〇〇様', 'romaji') をエディタから実行
+// 台帳で「お客様名」があり「スプシID」が空の行を見つけて、スプシを作る（エディタから実行）
+//   A列（コード）にローマ字を書いておくと、コードの先頭に使う。空なら c-… になる
+function createPending() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    var sheet = SpreadsheetApp.openById(prop_('LEDGER_ID')).getSheetByName(SHEET.LEDGER);
+    var last = sheet.getLastRow();
+    if (last < 2) return;
+    var rows = sheet.getRange(2, 1, last - 1, LEDGER_HEADERS.length).getValues();
+    rows.forEach(function (r, i) {
+      var name = String(r[1]).trim();
+      if (!name || r[3]) return;
+      var made = createCustomerSheet_(name, String(r[0]).trim());
+      sheet.getRange(i + 2, 1, 1, LEDGER_HEADERS.length).setValues([[
+        made.code, name, made.ss.getUrl(), made.ss.getId(), made.hearingUrl, made.summaryUrl, new Date(), true
+      ]]);
+      console.log('作成しました: ' + name + ' ' + made.hearingUrl);
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// エディタから直接作るとき：createCustomer('〇〇様', 'romaji')
 function createCustomer(name, prefix) {
   if (!name) throw new Error('お客様名を入れてください');
   var ledgerId = prop_('LEDGER_ID');
   if (!ledgerId) throw new Error('先に setup() を実行してください');
+  var made = createCustomerSheet_(name, prefix);
+  SpreadsheetApp.openById(ledgerId).getSheetByName(SHEET.LEDGER)
+    .appendRow([made.code, name, made.ss.getUrl(), made.ss.getId(), made.hearingUrl, made.summaryUrl, new Date(), true]);
+  console.log('作成しました\nスプシ: ' + made.ss.getUrl() + '\nヒアリング: ' + made.hearingUrl + '\nまとめ: ' + made.summaryUrl);
+  return made;
+}
 
-  var code = String(prefix || 'c').replace(/[^A-Za-z0-9]/g, '').toLowerCase().slice(0, 12) + '-' +
+function createCustomerSheet_(name, prefix) {
+  var code = (String(prefix || 'c').replace(/[^A-Za-z0-9]/g, '').toLowerCase().slice(0, 12) || 'c') + '-' +
     Utilities.getUuid().replace(/-/g, '').slice(0, 12);
 
   var ss = SpreadsheetApp.create('ヒアリング_' + name);
@@ -43,37 +73,24 @@ function createCustomer(name, prefix) {
     .requireValueInList([STATUS.NONE, STATUS.ANSWERED, STATUS.DECIDED], true).build());
   dec.setColumnWidth(2, 260).setColumnWidth(3, 320).setColumnWidth(5, 320);
 
-  var set = ss.insertSheet(SHEET.SETTINGS);
-  set.getRange(1, 1, 3, 2).setValues([
-    ['ページタイトル', name],
-    ['宛名', name],
-    ['案内文', 'ご確認・ご記入をお願いします。']
-  ]);
-  set.setColumnWidth(1, 160).setColumnWidth(2, 480);
-
   var hearingUrl = FRONT_URL + '?k=' + code;
   var summaryUrl = FRONT_URL + '?k=' + code + '#summary';
-  SpreadsheetApp.openById(ledgerId).getSheetByName(SHEET.LEDGER)
-    .appendRow([code, name, ss.getUrl(), ss.getId(), hearingUrl, summaryUrl, new Date(), true]);
+  var set = ss.insertSheet(SHEET.SETTINGS);
+  set.getRange(1, 1, 4, 2).setValues([
+    ['ページタイトル', name],
+    ['宛名', name],
+    ['案内文', 'ご確認・ご記入をお願いします。'],
+    ['お客様用URL（参考・表示されません）', hearingUrl]
+  ]);
+  set.setColumnWidth(1, 220).setColumnWidth(2, 480);
 
-  console.log('作成しました\nスプシ: ' + ss.getUrl() + '\nヒアリング: ' + hearingUrl + '\nまとめ: ' + summaryUrl);
   return { code: code, ss: ss, hearingUrl: hearingUrl, summaryUrl: summaryUrl };
 }
 
-// 項目タブの内容から、決定事項タブの行をそろえる（項目を足したあとに実行）
+// 項目タブの内容から、決定事項タブの行をそろえる（ページが開かれたときにも自動で行う）
 function syncDecisionRows(sheetId) {
-  var ss = SpreadsheetApp.openById(sheetId);
-  var items = readItems_(ss);
-  var dec = ss.getSheetByName(SHEET.DECISIONS);
-  var existing = readDecisions_(ss);
-  var rows = [];
-  items.forEach(function (it) {
-    if (existing[it.id]) return;
-    var isInfo = it.type === 'info';
-    rows.push([it.id, it.question, isInfo ? it.description : '', isInfo ? STATUS.ANSWERED : STATUS.NONE, '', new Date()]);
-  });
-  if (rows.length) dec.getRange(dec.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-  console.log('決定事項タブに ' + rows.length + ' 行追加しました');
+  var n = ensureDecisionRows_(SpreadsheetApp.openById(sheetId));
+  console.log('決定事項タブに ' + n + ' 行追加しました');
 }
 
 // 台帳のヒアリングURL・まとめURLを今のURL形式で書き直す（URLの形式を変えたあとに実行）

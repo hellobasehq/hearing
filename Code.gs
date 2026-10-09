@@ -37,6 +37,7 @@ function doPost(e) {
 
 function buildData_(customer, code) {
   var ss = SpreadsheetApp.openById(customer.sheetId);
+  ensureDecisionRows_(ss);
   return {
     code: code,
     settings: readSettings_(ss),
@@ -47,6 +48,31 @@ function buildData_(customer, code) {
       summary: webappUrl_() + '?k=' + encodeURIComponent(code) + '&p=summary'
     }
   };
+}
+
+// 項目タブにあって決定事項タブに無い行を足す（項目を足したあと、ページが開かれたときに自動でそろう）
+function ensureDecisionRows_(ss) {
+  var items = readItems_(ss);
+  var existing = readDecisions_(ss);
+  var missing = items.filter(function (it) { return !existing[it.id]; });
+  if (!missing.length) return 0;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return 0;
+  try {
+    existing = readDecisions_(ss);
+    var now = new Date();
+    var rows = items.filter(function (it) { return !existing[it.id]; }).map(function (it) {
+      var isInfo = it.type === 'info';
+      return [it.id, it.question, isInfo ? it.description : '', isInfo ? STATUS.ANSWERED : STATUS.NONE, '', now];
+    });
+    if (rows.length) {
+      var dec = ss.getSheetByName(SHEET.DECISIONS);
+      dec.getRange(dec.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    }
+    return rows.length;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function json_(obj) {
