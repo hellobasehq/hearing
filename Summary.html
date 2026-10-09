@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include_('Styles') ?>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs noprint"><a id="tabH">ヒアリング</a><a id="tabS" class="on">決定事項まとめ</a></nav>
+  <div class="hero">
+    <div class="kicker">決定事項まとめ</div>
+    <h1 id="title"></h1>
+    <p id="sub"></p>
+  </div>
+
+  <div id="decided"></div>
+  <div id="pending"></div>
+
+  <div class="noprint" style="margin-top:24px">
+    <p><button class="btn sub" type="button" onclick="window.print()">印刷・PDFにする</button></p>
+  </div>
+</div>
+
+<script>
+var DATA = <?!= json ?>;
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+document.getElementById('title').textContent = DATA.settings['ページタイトル'] || '';
+document.getElementById('tabH').href = DATA.links.hearing;
+document.getElementById('tabS').href = DATA.links.summary;
+
+var latestDate = '';
+Object.keys(DATA.decisions).forEach(function (k) {
+  var d = DATA.decisions[k].updatedAt;
+  if (d && d > latestDate) latestDate = d;
+});
+document.getElementById('sub').textContent =
+  '今決まっていることと、確認中のことの一覧です。' + (latestDate ? '（最終更新 ' + latestDate + '）' : '');
+
+function display(it, raw) {
+  var v = String(raw || '').trim();
+  if (!v) return null;
+  if (it.type === 'single' || it.type === 'multi') {
+    return v.split('\n').filter(String).map(function (label) {
+      var o = it.options.filter(function (x) { return x.label === label; })[0];
+      return o && o.note ? label + '：' + o.note : label;
+    }).join('\n');
+  }
+  if (it.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    var p = v.split('-');
+    return Number(p[0]) + '年' + Number(p[1]) + '月' + Number(p[2]) + '日';
+  }
+  return v;
+}
+
+function valueNode(it, text) {
+  var v = el('div', 'v');
+  if (it.type === 'color' && /^#[0-9a-fA-F]{6}$/.test(text)) {
+    var chip = el('span', 'chip'); chip.style.background = text; v.appendChild(chip);
+  }
+  v.appendChild(document.createTextNode(text));
+  return v;
+}
+
+var decidedBySection = [];
+var pending = [];
+DATA.items.forEach(function (it) {
+  var d = DATA.decisions[it.id] || { status: '未回答', latest: '', decided: '' };
+  if (d.status === '決定') {
+    var text = display(it, d.decided || d.latest || (it.type === 'info' ? it.description : ''));
+    if (!text) return;
+    var s = decidedBySection[decidedBySection.length - 1];
+    if (!s || s.name !== it.section) { s = { name: it.section, rows: [] }; decidedBySection.push(s); }
+    s.rows.push({ it: it, text: text });
+  } else {
+    pending.push({ it: it, d: d });
+  }
+});
+
+var dec = document.getElementById('decided');
+dec.appendChild(el('h2', null, '決まっていること'));
+if (!decidedBySection.length) {
+  dec.appendChild(el('p', 'muted', 'まだ決定した項目はありません。ヒアリングのご回答をもとに、確認のうえこちらに反映します。'));
+}
+decidedBySection.forEach(function (s) {
+  var card = el('div', 'card');
+  card.appendChild(el('p', 'q', s.name.replace(/^\d+\.\s*/, '')));
+  s.rows.forEach(function (r) {
+    var row = el('div', 'row');
+    row.appendChild(el('div', 'k', r.it.question));
+    row.appendChild(valueNode(r.it, r.text));
+    card.appendChild(row);
+  });
+  dec.appendChild(card);
+});
+
+var pen = document.getElementById('pending');
+if (pending.length) {
+  pen.appendChild(el('h2', null, '確認中のこと'));
+  var card = el('div', 'card');
+  pending.forEach(function (p) {
+    var row = el('div', 'row');
+    var k = el('div', 'k', p.it.question);
+    var answered = p.d.status === '回答あり';
+    var badge = el('span', 'badge ' + (answered ? 'b-warn' : 'b-none'), answered ? (p.it.type === 'info' ? '確認中' : '回答あり・確認中') : '未回答');
+    k.appendChild(badge);
+    row.appendChild(k);
+    var text = display(p.it, p.d.latest || (p.it.type === 'info' ? p.it.description : ''));
+    if (text) row.appendChild(valueNode(p.it, text));
+    card.appendChild(row);
+  });
+  pen.appendChild(card);
+}
+</script>
+</body>
+</html>

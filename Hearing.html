@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include_('Styles') ?>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs noprint"><a id="tabH" class="on">ヒアリング</a><a id="tabS">決定事項まとめ</a></nav>
+  <div class="hero">
+    <div class="kicker">HELLO base からのご確認</div>
+    <h1 id="title"></h1>
+    <p id="intro"></p>
+  </div>
+
+  <div class="progress noprint"><div id="bar"></div></div>
+  <div class="ptext noprint" id="ptext"></div>
+
+  <div class="done" id="done"></div>
+  <div id="form"></div>
+
+  <button class="btn" id="send" type="button">送信する</button>
+  <div class="note">送信したあとも、このページから何度でも直して送信できます</div>
+</div>
+
+<script>
+var DATA = <?!= json ?>;
+var COLORS = ['#1D9E75','#378ADD','#1F3A5F','#D85A30','#D4537E','#7F77DD','#BA7517','#5F5E5A'];
+var KEY = 'hearing-draft-' + DATA.code;
+var inputs = DATA.items.filter(function (it) { return it.type !== 'info'; });
+var values = {};
+
+function el(tag, attrs, text) {
+  var e = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) {
+    if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]);
+  });
+  if (text != null) e.textContent = text;
+  return e;
+}
+function loadDraft() {
+  try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function saveDraft() {
+  try { localStorage.setItem(KEY, JSON.stringify(values)); } catch (e) {}
+}
+function clearDraft() {
+  try { localStorage.removeItem(KEY); } catch (e) {}
+}
+
+document.getElementById('title').textContent = DATA.settings['ページタイトル'] || '';
+document.getElementById('intro').textContent =
+  (DATA.settings['宛名'] ? DATA.settings['宛名'] + '\n' : '') + (DATA.settings['案内文'] || '');
+document.getElementById('tabH').href = DATA.links.hearing;
+document.getElementById('tabS').href = DATA.links.summary;
+
+var draft = loadDraft();
+inputs.forEach(function (it) {
+  var d = DATA.decisions[it.id];
+  values[it.id] = draft[it.id] != null ? draft[it.id] : (d && d.status !== '未回答' ? d.latest : '');
+});
+
+var form = document.getElementById('form');
+var sections = [];
+DATA.items.forEach(function (it) {
+  var s = sections[sections.length - 1];
+  if (!s || s.name !== it.section) { s = { name: it.section, items: [] }; sections.push(s); }
+  s.items.push(it);
+});
+
+sections.forEach(function (s) {
+  form.appendChild(el('h2', null, s.name));
+  var infos = s.items.filter(function (it) { return it.type === 'info'; });
+  if (infos.length) {
+    var det = el('details', { class: 'info' });
+    if (infos.length <= 2) det.setAttribute('open', '');
+    det.appendChild(el('summary', null, infos.length > 2 ? '内容を見る（' + infos.length + '項目）' : '内容'));
+    var body = el('div', { class: 'infobody' });
+    infos.forEach(function (it) {
+      var box = el('div', { class: 'infoitem' });
+      box.appendChild(el('div', { class: 'k' }, it.question));
+      box.appendChild(el('div', { class: 'v' }, it.description));
+      body.appendChild(box);
+    });
+    det.appendChild(body);
+    form.appendChild(det);
+  }
+  s.items.filter(function (it) { return it.type !== 'info'; }).forEach(function (it) {
+    form.appendChild(renderInput(it));
+  });
+});
+
+function renderInput(it) {
+  var card = el('div', { class: 'card', id: 'card-' + it.id });
+  var q = el('p', { class: 'q' }, it.question);
+  if (it.required) q.appendChild(el('span', { class: 'req' }, '必須'));
+  card.appendChild(q);
+  if (it.description) card.appendChild(el('p', { class: 'desc' }, it.description));
+
+  if (it.type === 'single' || it.type === 'multi') {
+    var current = String(values[it.id] || '').split('\n').filter(String);
+    it.options.forEach(function (o, i) {
+      var lab = el('label', { class: 'opt' });
+      var inp = el('input', { type: it.type === 'single' ? 'radio' : 'checkbox', name: it.id, value: o.label });
+      if (current.indexOf(o.label) >= 0) { inp.checked = true; lab.classList.add('on'); }
+      var txt = el('span');
+      txt.appendChild(el('span', { class: 'lb' }, o.label));
+      if (o.note) txt.appendChild(el('span', { class: 'nt' }, o.note));
+      lab.appendChild(inp); lab.appendChild(txt);
+      inp.addEventListener('change', function () {
+        var boxes = card.querySelectorAll('input');
+        var picked = [];
+        boxes.forEach(function (b) { b.parentNode.classList.toggle('on', b.checked); if (b.checked) picked.push(b.value); });
+        setValue(it.id, picked.join('\n'));
+      });
+      card.appendChild(lab);
+    });
+  } else if (it.type === 'color') {
+    var wrap = el('div', { class: 'swatches' });
+    var picker = el('input', { type: 'color', 'aria-label': 'ほかの色を選ぶ' });
+    picker.style.width = '44px'; picker.style.height = '36px'; picker.style.border = '0'; picker.style.background = 'none';
+    var shown = el('span', { class: 'muted' });
+    function mark(v) {
+      wrap.querySelectorAll('.sw').forEach(function (sw) { sw.classList.toggle('on', sw.dataset.c === v); });
+      shown.textContent = v ? '選んだ色：' + v : '';
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) picker.value = v;
+    }
+    COLORS.forEach(function (c) {
+      var sw = el('button', { class: 'sw', type: 'button', 'aria-label': c });
+      sw.dataset.c = c; sw.style.background = c;
+      sw.addEventListener('click', function () { setValue(it.id, c); mark(c); });
+      wrap.appendChild(sw);
+    });
+    picker.addEventListener('input', function () { setValue(it.id, picker.value.toUpperCase()); mark(picker.value.toUpperCase()); });
+    wrap.appendChild(picker);
+    card.appendChild(wrap);
+    card.appendChild(shown);
+    var free = el('input', { type: 'text', placeholder: '色の名前やイメージでもかまいません（例：落ち着いた緑）' });
+    free.style.marginTop = '10px';
+    if (values[it.id] && !/^#[0-9a-fA-F]{6}$/.test(values[it.id])) free.value = values[it.id];
+    free.addEventListener('input', function () { setValue(it.id, free.value); mark(''); });
+    card.appendChild(free);
+    mark(values[it.id] || '');
+  } else {
+    var f;
+    if (it.type === 'textarea') f = el('textarea');
+    else f = el('input', { type: it.type === 'date' ? 'date' : 'text' });
+    f.value = values[it.id] || '';
+    f.addEventListener('input', function () { setValue(it.id, f.value); });
+    card.appendChild(f);
+  }
+  card.appendChild(el('div', { class: 'err' }, 'こちらの項目は必須です'));
+  return card;
+}
+
+function setValue(id, v) {
+  values[id] = v;
+  var card = document.getElementById('card-' + id);
+  if (card && v) card.classList.remove('bad');
+  saveDraft();
+  updateProgress();
+}
+
+function updateProgress() {
+  var done = inputs.filter(function (it) { return String(values[it.id] || '').trim(); }).length;
+  document.getElementById('bar').style.width = Math.round(done / Math.max(inputs.length, 1) * 100) + '%';
+  document.getElementById('ptext').textContent = '入力済み ' + done + ' / ' + inputs.length + ' 項目';
+}
+updateProgress();
+
+document.getElementById('send').addEventListener('click', function () {
+  var firstBad = null;
+  inputs.forEach(function (it) {
+    var card = document.getElementById('card-' + it.id);
+    var bad = it.required && !String(values[it.id] || '').trim();
+    card.classList.toggle('bad', bad);
+    if (bad && !firstBad) firstBad = card;
+  });
+  if (firstBad) { firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+
+  var payload = {};
+  inputs.forEach(function (it) { if (String(values[it.id] || '').trim()) payload[it.id] = values[it.id]; });
+  var btn = this;
+  btn.disabled = true; btn.textContent = '送信中…';
+  google.script.run
+    .withSuccessHandler(function (res) {
+      clearDraft();
+      btn.disabled = false; btn.textContent = 'もう一度送信する';
+      var box = document.getElementById('done');
+      box.textContent = res.at + ' に ' + res.count + ' 項目を受け付けました。ありがとうございます。内容を確認のうえ、決まったことは一覧に反映します。';
+      box.style.display = 'block';
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    })
+    .withFailureHandler(function (err) {
+      btn.disabled = false; btn.textContent = '送信する';
+      alert('送信できませんでした。時間をおいてもう一度お試しください。\n' + (err && err.message ? err.message : ''));
+    })
+    .submitAnswers(DATA.code, payload);
+});
+</script>
+</body>
+</html>

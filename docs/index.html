@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ヒアリング</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs noprint">
+    <a href="#hearing" id="tabH" class="on">ヒアリング</a>
+    <a href="#summary" id="tabS">決定事項まとめ</a>
+  </nav>
+
+  <div id="loading" class="card"><p class="desc" style="margin:0">読み込んでいます…</p></div>
+  <div id="error" class="card" style="display:none">
+    <p class="q">ページを表示できませんでした</p>
+    <p class="desc" id="errorText">URLが正しいかご確認ください。ご不明な点は HELLO base の担当者までお問い合わせください。</p>
+  </div>
+
+  <section id="pageHearing" style="display:none">
+    <div class="hero">
+      <div class="kicker">HELLO base からのご確認</div>
+      <h1 class="js-title"></h1>
+      <p id="intro"></p>
+    </div>
+    <div class="progress noprint"><div id="bar"></div></div>
+    <div class="ptext noprint" id="ptext"></div>
+    <div class="done" id="done"></div>
+    <div id="form"></div>
+    <button class="btn" id="send" type="button">送信する</button>
+    <div class="note">送信したあとも、このページから何度でも直して送信できます</div>
+  </section>
+
+  <section id="pageSummary" style="display:none">
+    <div class="hero">
+      <div class="kicker">決定事項まとめ</div>
+      <h1 class="js-title"></h1>
+      <p id="sub"></p>
+    </div>
+    <div id="decided"></div>
+    <div id="pending"></div>
+    <div class="noprint" style="margin-top:24px">
+      <button class="btn sub" type="button" onclick="window.print()">印刷・PDFにする</button>
+    </div>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
