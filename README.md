@@ -3,8 +3,11 @@
 お客様にURLを送るだけで、ログインなしでスマホから回答してもらえるページと、決まったことを一覧で見せるページ。Google Apps Script のWebアプリ（宮田さんのアカウントで実行）。
 
 ## URL
-- ヒアリング：`<WEBAPP_URL>?k=<コード>&p=hearing`
-- 決定事項まとめ：`<WEBAPP_URL>?k=<コード>&p=summary`
+- お客様に送るURL：`https://hellobasehq.github.io/hearing/?k=<コード>`（決定事項まとめは `#summary` を付けるか、ページ上のタブで切り替え）
+- 画面は GitHub Pages（このリポジトリの `docs/`）。データは Apps Script のWebアプリに `?p=data` で取りに行き、回答は POST で送る
+- 画面をGoogleの外に置いているのは、ブラウザが複数のGoogleアカウントにログインしていると Apps Script の画面が開けない不具合を避けるため
+- Apps Script 側の画面（`<WEBAPP_URL>?k=<コード>&p=hearing`）も残してあるが、お客様には使わない
+- 「c」「sid」は Apps Script の予約語なので、コードは「k」で渡す
 
 コードはお客様ごとに推測されにくい文字列を自動で振る。台帳の「有効」を FALSE にするとそのお客様のページは開けなくなる。
 

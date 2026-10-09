@@ -51,9 +51,8 @@ function createCustomer(name, prefix) {
   ]);
   set.setColumnWidth(1, 160).setColumnWidth(2, 480);
 
-  var base = webappUrl_();
-  var hearingUrl = base + '?k=' + code + '&p=hearing';
-  var summaryUrl = base + '?k=' + code + '&p=summary';
+  var hearingUrl = FRONT_URL + '?k=' + code;
+  var summaryUrl = FRONT_URL + '?k=' + code + '#summary';
   SpreadsheetApp.openById(ledgerId).getSheetByName(SHEET.LEDGER)
     .appendRow([code, name, ss.getUrl(), ss.getId(), hearingUrl, summaryUrl, new Date(), true]);
 
@@ -83,11 +82,10 @@ function refreshLedgerUrls() {
   var sheet = SpreadsheetApp.openById(prop_('LEDGER_ID')).getSheetByName(SHEET.LEDGER);
   var last = sheet.getLastRow();
   if (last < 2) return;
-  var base = webappUrl_();
   var codes = sheet.getRange(2, 1, last - 1, 1).getValues();
   var urls = codes.map(function (r) {
     var c = String(r[0]);
-    return c ? [base + '?k=' + c + '&p=hearing', base + '?k=' + c + '&p=summary'] : ['', ''];
+    return c ? [FRONT_URL + '?k=' + c, FRONT_URL + '?k=' + c + '#summary'] : ['', ''];
   });
   sheet.getRange(2, 5, urls.length, 2).setValues(urls);
   console.log(urls.length + ' 件のURLを書き直しました');

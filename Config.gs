@@ -6,6 +6,9 @@
 // 公開中のWebアプリ（デプロイID AKfycbyaKoN3…）。WEBAPP_URL を設定すればそちらを優先する
 var DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyaKoN3M58Y8McA8EE3ZA8-_lTRzXzxbLw9amPJGOvMIPkq7wlPBBL_9qbcmb-d6hbg/exec';
 
+// お客様に送る画面（GitHub Pages）。台帳のURLはこの形で記録する
+var FRONT_URL = 'https://hellobasehq.github.io/hearing/';
+
 var SHEET = {
   ITEMS: '項目',
   ANSWERS: '回答',
