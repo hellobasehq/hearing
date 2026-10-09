@@ -163,21 +163,17 @@ function notifySlack_(customer, changed) {
 
 // ---- 読み込み ----
 
+// コード → お客様のスプシは、スクリプトプロパティ「CUSTOMER_<コード>」にスプシIDで持つ（台帳のスプシは使わない）
+// お客様のスプシの「設定」タブで「有効」を FALSE にすると、そのページは開けなくなる
 function findCustomer_(code) {
   if (!code || !/^[A-Za-z0-9_-]{6,64}$/.test(code)) return null;
-  var ledgerId = prop_('LEDGER_ID');
-  if (!ledgerId) return null;
-  var sheet = SpreadsheetApp.openById(ledgerId).getSheetByName(SHEET.LEDGER);
-  var last = sheet.getLastRow();
-  if (last < 2) return null;
-  var rows = sheet.getRange(2, 1, last - 1, LEDGER_HEADERS.length).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    if (String(r[0]) === code && r[7] !== false && String(r[7]).toUpperCase() !== 'FALSE') {
-      return { code: code, name: String(r[1]), sheetUrl: String(r[2]), sheetId: String(r[3]) };
-    }
-  }
-  return null;
+  var sheetId = prop_(CUSTOMER_PREFIX + code);
+  if (!sheetId) return null;
+  var ss;
+  try { ss = SpreadsheetApp.openById(sheetId); } catch (err) { return null; }
+  var settings = readSettings_(ss);
+  if (String(settings['有効'] || 'TRUE').toUpperCase() === 'FALSE') return null;
+  return { code: code, name: settings['宛名'] || settings['ページタイトル'] || code, sheetUrl: ss.getUrl(), sheetId: sheetId };
 }
 
 function readSettings_(ss) {

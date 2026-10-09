@@ -1,5 +1,6 @@
 // スクリプトプロパティ（宮田さんが設定する）
-//   LEDGER_ID          … ヒアリング台帳のスプシID（setup() が自動で入れる）
+//   CUSTOMER_<コード>  … お客様のスプシID（createCustomer() が自動で入れる）
+//   LEDGER_ID          … 旧ヒアリング台帳のスプシID（migrateFromLedger() の移し替えにだけ使う）
 //   WEBAPP_URL         … デプロイしたWebアプリのURL（/exec まで）
 //   SLACK_WEBHOOK_URL  … 回答があったときの通知先（未設定なら通知しない）
 
@@ -8,6 +9,9 @@ var DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyaKoN3M58Y8Mc
 
 // お客様に送る画面（GitHub Pages）。台帳のURLはこの形で記録する
 var FRONT_URL = 'https://hellobasehq.github.io/hearing/';
+
+// お客様ごとのスプシIDを持つスクリプトプロパティの接頭辞
+var CUSTOMER_PREFIX = 'CUSTOMER_';
 
 var SHEET = {
   ITEMS: '項目',
